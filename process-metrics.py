@@ -1,6 +1,18 @@
 import numpy as np
 import sys
 import csv
+import argparse
+
+parser = argparse.ArgumentParser(
+    description='Post-process of collected hw-events', 
+    usage='process-metrics.py infile -o outfile')
+
+parser.add_argument('infile', action='store', type=str,
+                    help='The input file that contains the hw-events values.')
+
+parser.add_argument('-o', '--outfile', type=str, default='metrics.csv',
+                    help='The output file to write the calculated metrics'
+                    ' Default: metrics.csv')
 
 
 metrics = {
@@ -81,11 +93,13 @@ def evaluate_metric(header, data, dict_name, name, expression):
 
 
 if __name__ == '__main__':
-    if len(sys.argv) < 3:
-        print("You must specify the input file and the output file")
-        exit(-1)
-    input_file = sys.argv[1]
-    out_file = sys.argv[2]
+    args = parser.parse_args()
+
+    # if len(sys.argv) < 3:
+    #     print("You must specify the input file and the output file")
+    #     exit(-1)
+    input_file = args.infile
+    out_file = args.outfile
     header, data = parse_input(input_file)
     metrics_result = [['metric'] + sorted(data.keys())]
     for k, v in metrics.items():

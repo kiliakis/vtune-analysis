@@ -5,7 +5,8 @@ import argparse
 # usage: python vtune-report-summary.py [result_dir] [report_output_file]
 
 parser = argparse.ArgumentParser(description='Generate the general-exploration'
-                                 ' report summary')
+                                 ' report summary',
+                                 usage='report-summary.py -result-dir results/ -report-output summary.csv')
 
 # parser.add_argument('-', '--parallel',
 #                     default=False, action='store_true',
