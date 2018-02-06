@@ -13,7 +13,7 @@ parser.add_argument('infile', action='store', type=str,
 parser.add_argument('-o', '--outfile', type=str, default='metrics.csv',
                     help='The output file to write the calculated metrics'
                     ' Default: metrics.csv')
-
+isHTEnabled = True
 
 metrics = {
     # 'mpki': '1000 * self.mem_load_uops_retired.l3_hit_ps / self.inst_retired.any',
@@ -26,38 +26,109 @@ metrics = {
                      '/ (4 * self.cpu_clk_unhalted.thread)'),
     'front_bound.contribution%': ('100 * self.idq_uops_not_delivered.core'
                                   '/ (4 * total.cpu_clk_unhalted.thread)'),
+    'bad_speculation%': ('100 * ((self.uops_issued.any '
+                         '- self.uops_retired.retire_slots +'
+                         '4 * self.int_misc.recovery_cycles)'
+                         '/(4 * self.cpu_clk_unhalted.thread))'),
+    'bad_speculation.contribution%': ('100 * ((self.uops_issued.any '
+                                      '- self.uops_retired.retire_slots +'
+                                      '4 * self.int_misc.recovery_cycles)'
+                                      '/(4 * total.cpu_clk_unhalted.thread))'),
+    'retiring%': ('100 * (self.uops_retired.retire_slots/'
+                  '(4 * self.cpu_clk_unhalted.thread))'),
+    'retiring.contribution%': ('100 * (self.uops_retired.retire_slots/'
+                               '(4 * total.cpu_clk_unhalted.thread))'),
     'be_bound%': ('100 * (1 - (self.idq_uops_not_delivered.core'
                   '+ self.uops_issued.any + 4 * self.int_misc.recovery_cycles)'
                   '/ (4 * self.cpu_clk_unhalted.thread))'),
     'be_bound.contribution%': (
         'self.cpu_clk_unhalted.thread /'
-        'total.cpu_clk_unhalted.thread * 100 * '
+        'total.cpu_clk_unhalted.thread * 100 *'
         '(1 - (self.idq_uops_not_delivered.core +'
         'self.uops_issued.any + 4 * self.int_misc.recovery_cycles)'
         '/ (4 * self.cpu_clk_unhalted.thread))'),
-    'core_bound%': (
-        '100 * (1 - (self.idq_uops_not_delivered.core '
-        '+ self.uops_issued.any + 4 * self.int_misc.recovery_cycles)'
-        '/ (4 * self.cpu_clk_unhalted.thread)) '
-        '- 100 * self.cycle_activity.stalls_ldm_pending '
-        '/ self.cpu_clk_unhalted.thread'),
-    'core_bound.contribution%': (
-        '(self.cpu_clk_unhalted.thread '
-        '/ total.cpu_clk_unhalted.thread) '
-        '* (100 * (1 - (self.idq_uops_not_delivered.core '
-        '+ self.uops_issued.any + 4 * self.int_misc.recovery_cycles) '
-        '/ (4 * self.cpu_clk_unhalted.thread))'
-        '- 100 * self.cycle_activity.stalls_ldm_pending '
-        '/ self.cpu_clk_unhalted.thread)'),
-    'mem_bound%': ('100 * self.cycle_activity.stalls_ldm_pending '
-                   '/ self.cpu_clk_unhalted.thread'),
-    'mem_bound.contribution%': ('100 * self.cycle_activity.stalls_ldm_pending'
-                                '/ total.cpu_clk_unhalted.thread'),
-    'l1_bound%': ('100 * (self.cycle_activity.stalls_ldm_pending '
-                  '- self.cycle_activity.stalls_l1d_pending) '
+    # 'core_bound2%': (
+    #     '100 * (1 - (self.idq_uops_not_delivered.core'
+    #     '+ self.uops_issued.any + 4 * self.int_misc.recovery_cycles)'
+    #     '/ (4 * self.cpu_clk_unhalted.thread))'
+    #     '- 100 * self.cycle_activity.stalls_ldm_pending'
+    #     '/ self.cpu_clk_unhalted.thread'),
+    # 'core_bound2.contribution%': (
+    #     '(self.cpu_clk_unhalted.thread'
+    #     '/ total.cpu_clk_unhalted.thread)'
+    #     '*(100 * (1-(self.idq_uops_not_delivered.core'
+    #     '+ self.uops_issued.any+4 * self.int_misc.recovery_cycles)'
+    #     '/ (4 * self.cpu_clk_unhalted.thread))'
+    #     '-100 * self.cycle_activity.stalls_ldm_pending'
+    #     '/ self.cpu_clk_unhalted.thread)'),
+    'core_bound%': ('100 * (1 - (self.idq_uops_not_delivered.core'
+                     '+ self.uops_issued.any + 4 * self.int_misc.recovery_cycles)'
+                     '/ (4 * self.cpu_clk_unhalted.thread)) -'
+                     '100 * (((min(self.cpu_clk_unhalted.thread, self.cycle_activity.stalls_ldm_pending)'
+                     '+ self.resource_stalls.sb)/ ((min(self.cpu_clk_unhalted.thread, self.cycle_activity.cycles_no_execute) '
+                     '+ (self.uops_executed.core:cmask=1 - '
+                     '(self.uops_executed.core:cmask=3 if (self.inst_retired.any/ self.cpu_clk_unhalted.thread > 1.8) '
+                     'else self.uops_executed.core:cmask=2))/ 2 - '
+                     '(self.rs_events.empty_cycles if ((4 * min(self.cpu_clk_unhalted.thread, self.idq_uops_not_delivered.cycles_0_uops_deliv.core) '
+                     '/ (4 * self.cpu_clk_unhalted.thread ) ) > 0.1 ) else 0 ) '
+                     '+ self.resource_stalls.sb ))) *(1 -((self.idq_uops_not_delivered.core + self.uops_issued.any '
+                     '+ 4 * self.int_misc.recovery_cycles)/(4 * self.cpu_clk_unhalted.thread))))'),
+
+    'core_bound.contribution%': ('self.cpu_clk_unhalted.thread/ total.cpu_clk_unhalted.thread *'
+                                  '(100 * (1 - (self.idq_uops_not_delivered.core'
+                                  '+ self.uops_issued.any + 4 * self.int_misc.recovery_cycles)'
+                                  '/ (4 * self.cpu_clk_unhalted.thread)) -'
+                                  '100 * (((min(self.cpu_clk_unhalted.thread, self.cycle_activity.stalls_ldm_pending)'
+                                  '+ self.resource_stalls.sb)/ ((min(self.cpu_clk_unhalted.thread, self.cycle_activity.cycles_no_execute) '
+                                  '+ (self.uops_executed.core:cmask=1 - '
+                                  '(self.uops_executed.core:cmask=3 if (self.inst_retired.any/ self.cpu_clk_unhalted.thread > 1.8) '
+                                  'else self.uops_executed.core:cmask=2))/ 2 - '
+                                  '(self.rs_events.empty_cycles if ((4 * min(self.cpu_clk_unhalted.thread, self.idq_uops_not_delivered.cycles_0_uops_deliv.core) '
+                                  '/ (4 * self.cpu_clk_unhalted.thread ) ) > 0.1 ) else 0 ) '
+                                  '+ self.resource_stalls.sb ))) *(1 -((self.idq_uops_not_delivered.core + self.uops_issued.any '
+                                  '+ 4 * self.int_misc.recovery_cycles)/(4 * self.cpu_clk_unhalted.thread)))))'),
+
+    # 'mem_bound2%': ('100 * self.cycle_activity.stalls_ldm_pending'
+    #                '/ self.cpu_clk_unhalted.thread'),
+    # 'mem_bound2.contribution%': ('100 * self.cycle_activity.stalls_ldm_pending'
+    #                             '/ total.cpu_clk_unhalted.thread'),
+    # 'mem_bound2%': (
+    #     '100 * (((min(self.cpu_clk_unhalted.thread, self.cycle_activity.stalls_ldm_pending)'
+    #     '+ self.resource_stalls.sb)/ (min(self.cpu_clk_unhalted.thread, self.cycle_activity.cycles_no_execute)'
+    #     '+ self.uops_executed.core:cmask=1 -(self.uops_executed.core:cmask=3 '
+    #     'if (self.inst_retired.any/ self.cpu_clk_unhalted.thread > 1.8 ) else self.uops_executed.core:cmask=2)'
+    #     '- (self.rs_events.empty_cycles if ((4 * min(self.cpu_clk_unhalted.thread, self.idq_uops_not_delivered.cycles_0_uops_deliv.core)'
+    #     '/ (4 * self.cpu_clk_unhalted.thread)) > 0.1 ) else 0)+self.resource_stalls.sb))'
+    #     '* (1-((self.idq_uops_not_delivered.core+self.uops_issued.any + 4 * self.int_misc.recovery_cycles)'
+    #     '/(4 * self.cpu_clk_unhalted.thread))))'),
+    'mem_bound%': (
+        '100 * (((min(self.cpu_clk_unhalted.thread, self.cycle_activity.stalls_ldm_pending)'
+        '+ self.resource_stalls.sb)/ ((min(self.cpu_clk_unhalted.thread, self.cycle_activity.cycles_no_execute) '
+        '+ (self.uops_executed.core:cmask=1 - '
+        '(self.uops_executed.core:cmask=3 if (self.inst_retired.any/ self.cpu_clk_unhalted.thread > 1.8) '
+        'else self.uops_executed.core:cmask=2))/ 2 - '
+        '(self.rs_events.empty_cycles if ((4 * min(self.cpu_clk_unhalted.thread, self.idq_uops_not_delivered.cycles_0_uops_deliv.core) '
+        '/ (4 * self.cpu_clk_unhalted.thread ) ) > 0.1 ) else 0 ) '
+        '+ self.resource_stalls.sb ))) *(1 -((self.idq_uops_not_delivered.core + self.uops_issued.any '
+        '+ 4 * self.int_misc.recovery_cycles)/(4 * self.cpu_clk_unhalted.thread))))'
+    ),
+    'mem_bound.contribution%': (
+        'self.cpu_clk_unhalted.thread/ total.cpu_clk_unhalted.thread'
+        '* 100 * (((min(self.cpu_clk_unhalted.thread, self.cycle_activity.stalls_ldm_pending)'
+        '+ self.resource_stalls.sb)/ ((min(self.cpu_clk_unhalted.thread, self.cycle_activity.cycles_no_execute) '
+        '+ (self.uops_executed.core:cmask=1 - '
+        '(self.uops_executed.core:cmask=3 if (self.inst_retired.any/ self.cpu_clk_unhalted.thread > 1.8) '
+        'else self.uops_executed.core:cmask=2))/ 2 - '
+        '(self.rs_events.empty_cycles if ((4 * min(self.cpu_clk_unhalted.thread, self.idq_uops_not_delivered.cycles_0_uops_deliv.core) '
+        '/ (4 * self.cpu_clk_unhalted.thread ) ) > 0.1 ) else 0 ) '
+        '+ self.resource_stalls.sb ))) *(1 -((self.idq_uops_not_delivered.core + self.uops_issued.any '
+        '+ 4 * self.int_misc.recovery_cycles)/(4 * self.cpu_clk_unhalted.thread))))'
+    ),
+    'l1_bound%': ('100 * (self.cycle_activity.stalls_ldm_pending'
+                  '- self.cycle_activity.stalls_l1d_pending)'
                   '/ self.cpu_clk_unhalted.thread'),
-    'l3_latency%': ('(41 * ( self.mem_load_uops_retired.l3_hit_ps'
-                    '* (1 + self.mem_load_uops_retired.hit_lfb_ps / '
+    'l3_latency%': ('(41 * (self.mem_load_uops_retired.l3_hit_ps'
+                    '* (1 + self.mem_load_uops_retired.hit_lfb_ps/'
                     '((self.mem_load_uops_retired.l2_hit_ps +'
                     'self.mem_load_uops_retired.l3_hit_ps +'
                     'self.mem_load_uops_l3_hit_retired.xsnp_hit_ps +'
@@ -82,10 +153,10 @@ metrics = {
         'self.mem_load_uops_l3_miss_retired.remote_fwd_ps)))'
         '/total.cpu_clk_unhalted.thread)'),
     'l3_data_sharing%': (
-        '(43 * (self.mem_load_uops_l3_hit_retired.xsnp_hit_ps '
+        '(43 * (self.mem_load_uops_l3_hit_retired.xsnp_hit_ps'
         '*(1 + self.mem_load_uops_retired.hit_lfb_ps /'
-        '((self.mem_load_uops_retired.l2_hit_ps + '
-        'self.mem_load_uops_retired.l3_hit_ps + '
+        '((self.mem_load_uops_retired.l2_hit_ps +'
+        'self.mem_load_uops_retired.l3_hit_ps +'
         'self.mem_load_uops_l3_hit_retired.xsnp_hit_ps +'
         'self.mem_load_uops_l3_hit_retired.xsnp_hitm_ps +'
         'self.mem_load_uops_l3_hit_retired.xsnp_miss_ps) +'
@@ -97,8 +168,8 @@ metrics = {
     'l3_data_sharing.contribution%': (
         '(43 * (self.mem_load_uops_l3_hit_retired.xsnp_hit_ps '
         '*(1 + self.mem_load_uops_retired.hit_lfb_ps /'
-        '((self.mem_load_uops_retired.l2_hit_ps + '
-        'self.mem_load_uops_retired.l3_hit_ps + '
+        '((self.mem_load_uops_retired.l2_hit_ps +'
+        'self.mem_load_uops_retired.l3_hit_ps +'
         'self.mem_load_uops_l3_hit_retired.xsnp_hit_ps +'
         'self.mem_load_uops_l3_hit_retired.xsnp_hitm_ps +'
         'self.mem_load_uops_l3_hit_retired.xsnp_miss_ps) +'
@@ -211,18 +282,6 @@ metrics = {
         '+ self.mem_load_uops_l3_miss_retired.remote_hitm_ps'
         '+ self.mem_load_uops_l3_miss_retired.remote_fwd_ps)))'
         '/ total.cpu_clk_unhalted.thread)'),
-    'bad_speculation%': ('100 * ((self.uops_issued.any '
-                         '- self.uops_retired.retire_slots +'
-                         '4 * self.int_misc.recovery_cycles)'
-                         '/(4 * self.cpu_clk_unhalted.thread))'),
-    'bad_speculation.contribution%': ('100 * ((self.uops_issued.any '
-                                      '- self.uops_retired.retire_slots +'
-                                      '4 * self.int_misc.recovery_cycles)'
-                                      '/(4 * total.cpu_clk_unhalted.thread))'),
-    'retiring%': ('100 * (self.uops_retired.retire_slots/'
-                  '(4 * self.cpu_clk_unhalted.thread))'),
-    'retiring.contribution%': ('100 * (self.uops_retired.retire_slots/'
-                               '(4 * total.cpu_clk_unhalted.thread))'),
     'be_bound_at_exe%': ('100 * (self.cycle_activity.cycles_no_execute '
                          '+ self.uops_executed.core:cmask=1 '
                          '- self.uops_executed.core:cmask=2) '
@@ -273,7 +332,8 @@ def evaluate_metric(header, data, dict_name, name, expression):
                 val = 0
         except SyntaxError as se:
             print('---------------')
-            print('[%s:%s]: Coudl not be evaluated' % (name, task))
+            print('[%s:%s]: Could not be evaluated' % (name, task))
+            print(string)
             print('---------------')
             val = 'NaN'
         result.append(val)
