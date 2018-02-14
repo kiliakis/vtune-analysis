@@ -33,6 +33,6 @@ if __name__ == '__main__':
         amplxe_args += ['-group-by', 'task']
     if args.outfile:
         amplxe_args += ['-report-output', args.outfile]
-    if args.infile:
+    if args.indir:
         amplxe_args += ['-result-dir', args.indir]
     subprocess.call(amplxe_args)
