@@ -17,7 +17,7 @@ parser.add_argument('-o', '--outfile', type=str, default=None,
 
 parser.add_argument('-i', '--indir', type=str, default=None,
                     help='The directory containing the collected data.'
-                    ' Default: None (print to the stdout)')
+                    ' Default: None (use the most recent result dir)')
 
 
 amplxe_args = [
