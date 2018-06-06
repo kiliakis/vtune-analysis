@@ -18,7 +18,7 @@ from datetime import datetime
 # separate directory
 
 timestr = datetime.now().strftime('%d%b%y.%H-%M-%S')
-custom_template = '/afs/cern.ch/work/k/kiliakis/git/blond-benchmark/scripts/custom.tmpl'
+custom_template = './custom.tmpl'
 
 parser = argparse.ArgumentParser(description='Collect and report the metrics needed '
                                  'to plot the roofline model.',

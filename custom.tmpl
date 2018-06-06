@@ -1,0 +1,76 @@
+# This is an example of custom report template. Copy it from <Advisor install dir>/config/report/custom.tmpl
+# to arbitrary location and modify for your needs.
+# You could find more examples of report templates based on Python API in the
+# <Advisor install dir>/config/report directory (see joined.tmpl or roofs.tmpl).
+
+# Run your custom report with
+# source <advisor_install_dir>/advixe_vars.sh
+# advixe-cl --report custom --report-template <path_to_your_template_file> --project-dir <path_to_advisor_project_with_collected_results>
+import sys
+# import advixe_discmodels_python2 as advisor
+import advixe_discpythonapi1 as advisor
+import disccli2 as common
+
+# select top 5 loops by self-time
+
+
+def select_top5(rows):
+    # import numpy as np
+    if not rows:
+        return []
+    to_print = ['call_count', 'dynamic', 'loop_name', 'self_elapsed_time', 'self_memory_gb', 'self_time', 'module']
+    keys = ['self_time', 'self_gflop', 'self_memory_gb']
+    data = [['total_time', 'total_gflop',
+             'total_memory_gb', 'total_gflops', 'total_ai']]
+    sums = [0.]*len(keys)
+    # print(rows)
+    # print(rows[0])
+    flag = True
+    # top = 6
+    for row,_ in zip(rows, range(0,6)):
+        # print(row)
+        # if flag == True:
+        for k in row:
+            if sum([t in k for t in to_print]) > 0:
+                if row[k] != '' and row[k] != '0':
+                    print(k, row[k])
+                
+            flag = False
+        print('-------------------')
+
+        for i in range(len(keys)):
+            if row[keys[i]]:
+                sums[i] += float(row[keys[i]])
+    data.append([str(sums[0]), str(sums[1]), str(sums[2]),
+                 str(sums[1]/sums[0]), str(sums[1]/sums[2])])
+    # print(data)
+    return data
+
+
+# It is good idea to support output and format arguments for custom report. But you may
+# select single format and print to stdout and ignore these arguments if you wish.
+format = environment.cmd_args['output_format']
+output = environment.cmd_args['output_file']
+delim = environment.cmd_args['csv_delimiter']
+
+if output:
+    prev_stdout = sys.stdout
+    sys.stdout = open(output, 'w')
+
+# data_input is a predefined entity used by Advisor which corresponds to --project_dir argument
+# You need to open the project and load specific data from it. Note that you have
+# to collect data beforehand, using either advixe-gui or advixe-cl
+project = advisor.open_project(data_input, _progress, _messenger)
+survey = project.load(advisor.ModelType.SURVEY)
+if survey:
+    table = select_top5(survey.get_bottomup_rows())
+    # print(table)
+    common.draw_table(table, format, delim, element_name='summary')
+    # draw_table(table, format, delim)
+
+# This is how you could see all available columns
+# for name, description in survey.get_column_descriptions().items():
+#     print('{}: {}'.format(name, description))
+
+if output:
+    sys.stdout = prev_stdout
