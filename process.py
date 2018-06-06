@@ -15,6 +15,15 @@ parser.add_argument('-o', '--outfile', type=str, default='metrics.csv',
                     ' Default: metrics.csv')
 isHTEnabled = True
 
+
+# def human_format(num):
+#     magnitude = 0
+#     while abs(num) >= 1000:
+#         magnitude += 1
+#         num /= 1000
+#     # add more suffixes if you need them
+#     return '%d%s' % (num, ['', 'K', 'M', 'G', 'T', 'P'][magnitude])
+
 metrics = {
     # 'mpki': '1000 * self.mem_load_uops_retired.l3_hit_ps / self.inst_retired.any',
     'time(s)': ('self.task_time'),
@@ -290,6 +299,8 @@ metrics = {
                               '/ self.cpu_clk_unhalted.thread'),
     'resource_stalls_cost.contribution%': ('100 * self.resource_stalls.any'
                                            '/ total.cpu_clk_unhalted.thread'),
+    'instructions': ('\'{:.2e}\'.format(self.inst_retired.any)'),
+    'cycles': ('\'{:.2e}\'.format(self.cpu_clk_unhalted.thread)'),
 
     # 'uncore_bound': '100 * self.cycle_activity.stalls_l2_pending / self.cpu_clk_unhalted.thread'
     '': ''
@@ -336,6 +347,8 @@ def evaluate_metric(header, data, dict_name, name, expression):
             print(string)
             print('---------------')
             val = 'NaN'
+        except TypeError as te:
+            val = eval(string.lower())
         result.append(val)
     return result
 
